@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>طلبات فك الحظر</title>
 
   <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
@@ -10,55 +10,52 @@
 
   <style>
     html, body {
-      padding: 0;
       margin: 0;
+      padding: 0;
       height: 100%;
       font-family: Tahoma, Arial, sans-serif;
       background: #f5f7fa;
     }
 
-    .app {
-      display: grid;
-      grid-template-columns: 390px 1fr;
-      height: 100vh;
+    body {
+      display: flex;
+      flex-direction: column;
     }
 
-    .sidebar {
-      background: #ffffff;
-      border-left: 1px solid #d9e2ec;
-      padding: 18px;
-      overflow-y: auto;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
-    }
-
-    .title {
-      font-size: 28px;
-      font-weight: bold;
-      color: #0b5cab;
-      margin-bottom: 18px;
+    .header {
+      background: #0b5cab;
+      color: white;
       text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      padding: 14px 10px;
+    }
+
+    .panel {
+      background: white;
+      padding: 12px;
+      border-bottom: 1px solid #d9e2ec;
     }
 
     .card {
       background: #f9fbfd;
       border: 1px solid #dbe4ee;
-      border-radius: 14px;
-      padding: 14px;
-      margin-bottom: 14px;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
     }
 
     .card h3 {
-      margin: 0 0 12px 0;
+      margin: 0 0 10px 0;
+      font-size: 16px;
       color: #1f2937;
-      font-size: 18px;
     }
 
     label {
       display: block;
       margin: 8px 0 4px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
-      color: #374151;
     }
 
     input {
@@ -68,135 +65,124 @@
       border: 1px solid #cbd5e1;
       border-radius: 8px;
       font-size: 14px;
-      background: #fff;
+      background: white;
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
     }
 
     button {
-      width: 100%;
-      margin-top: 12px;
-      padding: 10px;
+      padding: 11px;
       border: none;
       border-radius: 8px;
       background: #0b5cab;
       color: white;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
-    }
-
-    button:hover {
-      background: #08498a;
     }
 
     .secondary {
       background: #64748b;
     }
 
-    .secondary:hover {
-      background: #475569;
-    }
-
     .result {
       background: #eef6ff;
       border: 1px solid #bfdbfe;
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 14px;
-      line-height: 1.9;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.8;
       color: #1e3a8a;
+      margin-top: 10px;
       word-break: break-word;
     }
 
     #viewDiv {
-      height: 100%;
+      flex: 1;
+      min-height: 55vh;
       width: 100%;
     }
 
     .note {
       font-size: 12px;
       color: #6b7280;
-      margin-top: 10px;
       line-height: 1.7;
+      margin-top: 8px;
     }
 
-    .small {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 6px;
-    }
-
-    @media (max-width: 900px) {
-      .app {
-        grid-template-columns: 1fr;
+    @media (min-width: 900px) {
+      body {
+        display: grid;
+        grid-template-columns: 380px 1fr;
         grid-template-rows: auto 1fr;
       }
 
-      .sidebar {
-        border-left: none;
-        border-bottom: 1px solid #d9e2ec;
+      .header {
+        grid-column: 1 / 3;
+      }
+
+      .panel {
+        border-left: 1px solid #d9e2ec;
+        border-bottom: none;
+        overflow-y: auto;
+      }
+
+      #viewDiv {
+        min-height: calc(100vh - 60px);
       }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="sidebar">
-      <div class="title">طلبات فك الحظر</div>
+  <div class="header">طلبات فك الحظر</div>
 
-      <div class="card">
-        <h3>البحث بالإحداثيات العشرية</h3>
-
-        <label for="latDecimal">Latitude</label>
-        <input id="latDecimal" type="number" step="any" placeholder="مثال: 24.7136" />
-
-        <label for="lonDecimal">Longitude</label>
-        <input id="lonDecimal" type="number" step="any" placeholder="مثال: 46.6753" />
-
-        <button onclick="searchDecimal()">بحث بالعشري</button>
-      </div>
-
-      <div class="card">
-        <h3>البحث بالإحداثيات بالدرجات</h3>
-
-        <label for="latDMS">Latitude DMS</label>
-        <input id="latDMS" type="text" placeholder='مثال: 24°42&apos;49"N' />
-
-        <label for="lonDMS">Longitude DMS</label>
-        <input id="lonDMS" type="text" placeholder='مثال: 46°40&apos;31"E' />
-
-        <button onclick="searchDMS()">بحث بالدرجات</button>
-      </div>
-
-      <div class="card">
-        <h3>البحث بالإحداثيات المترية UTM</h3>
-
-        <label for="easting">Easting</label>
-        <input id="easting" type="number" step="any" placeholder="مثال: 671000" />
-
-        <label for="northing">Northing</label>
-        <input id="northing" type="number" step="any" placeholder="مثال: 2734000" />
-
-        <label for="zone">Zone</label>
-        <input id="zone" type="number" value="38" />
-
-        <button onclick="searchUTM()">بحث بالمتري</button>
-
-        <div class="small">الزون الافتراضي: 38</div>
-      </div>
-
-      <div class="card">
-        <button class="secondary" onclick="clearInputs()">مسح الحقول</button>
-        <div class="note">
-          اضغط مباشرة على أي خط داخل الخريطة لإظهار البيانات.
-        </div>
-      </div>
-
-      <div class="result" id="result">
-        أدخل الإحداثيات بأي صيغة، أو اضغط على أي خط داخل الخريطة لعرض البيانات.
+  <div class="panel">
+    <div class="card">
+      <h3>البحث العشري</h3>
+      <label>Latitude</label>
+      <input id="latDecimal" type="number" step="any" placeholder="24.7136" />
+      <label>Longitude</label>
+      <input id="lonDecimal" type="number" step="any" placeholder="46.6753" />
+      <div class="btn-row">
+        <button onclick="searchDecimal()">بحث</button>
+        <button class="secondary" onclick="clearInputs()">مسح</button>
       </div>
     </div>
 
-    <div id="viewDiv"></div>
+    <div class="card">
+      <h3>البحث بالدرجات</h3>
+      <label>Latitude DMS</label>
+      <input id="latDMS" type="text" placeholder='24°42&apos;49"N' />
+      <label>Longitude DMS</label>
+      <input id="lonDMS" type="text" placeholder='46°40&apos;31"E' />
+      <button onclick="searchDMS()">بحث بالدرجات</button>
+    </div>
+
+    <div class="card">
+      <h3>البحث المتري UTM</h3>
+      <label>Easting</label>
+      <input id="easting" type="number" step="any" placeholder="671000" />
+      <label>Northing</label>
+      <input id="northing" type="number" step="any" placeholder="2734000" />
+      <label>Zone</label>
+      <input id="zone" type="number" value="38" />
+      <button onclick="searchUTM()">بحث بالمتري</button>
+    </div>
+
+    <div class="result" id="result">
+      اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.
+    </div>
+
+    <div class="note">
+      في الجوال يفضل فتح الصفحة بمتصفح Chrome أو Safari محدث. ArcGIS Maps SDK يعتمد على WebGL2 ومتصفح مدعوم. :contentReference[oaicite:1]{index=1}
+    </div>
   </div>
+
+  <div id="viewDiv"></div>
 
   <script>
     let view, graphicsLayer, featureLayer;
@@ -230,7 +216,7 @@
           symbol: {
             type: "simple-line",
             color: [255, 0, 0, 1],
-            width: 5
+            width: 6
           }
         }
       });
@@ -248,7 +234,6 @@
         popup: {
           dockEnabled: true,
           dockOptions: {
-            buttonEnabled: true,
             breakpoint: false,
             position: "top-right"
           }
@@ -263,28 +248,18 @@
         view.on("click", function(event) {
           view.hitTest(event).then(function(response) {
             const results = response.results.filter(function(r) {
-              return r.graphic &&
-                     r.graphic.layer &&
-                     r.graphic.layer === featureLayer;
+              return r.graphic && r.graphic.layer === featureLayer;
             });
 
             if (results.length > 0) {
-              const g = results[0].graphic;
-              const a = g.attributes || {};
-
+              const a = results[0].graphic.attributes || {};
               const content =
                 "<b>رقم الطلب:</b> " + safeVal(a.RequestID) + "<br>" +
                 "<b>رقم الحظر:</b> " + safeVal(a.BlockingId) + "<br>" +
                 "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
-                "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
                 "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
-                "<b>نوع الخدمة الفرعية:</b> " + safeVal(a.SubServiceType) + "<br>" +
-                "<b>طول المسار:</b> " + safeVal(a.PathLength) + "<br>" +
-                "<b>عرض المسار:</b> " + safeVal(a.PathWidth) + "<br>" +
-                "<b>عمق المسار:</b> " + safeVal(a.PathDepth) + "<br>" +
-                "<b>عرض الشارع:</b> " + safeVal(a.StreetWidth) + "<br>" +
-                "<b>رقم طلب إصدار الرخصة:</b> " + safeVal(a.PermitReqNum) + "<br>" +
-                "<b>تاريخ إصدار الرخصة:</b> " + formatDate(a.PermitRequestDate);
+                "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
+                "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType);
 
               view.popup.open({
                 title: "طلب فك الحظر - " + safeVal(a.RequestID),
@@ -301,36 +276,27 @@
       window.searchDecimal = function () {
         const lat = parseFloat(document.getElementById("latDecimal").value);
         const lon = parseFloat(document.getElementById("lonDecimal").value);
-
         if (isNaN(lat) || isNaN(lon)) {
-          alert("أدخل Latitude و Longitude بشكل صحيح");
+          alert("أدخل الإحداثيات العشرية بشكل صحيح");
           return;
         }
-
-        goToLatLon(lat, lon, "الإحداثيات العشرية");
+        goToLatLon(lat, lon, "العشري");
       };
 
       window.searchDMS = function () {
         const latText = document.getElementById("latDMS").value.trim();
         const lonText = document.getElementById("lonDMS").value.trim();
-
-        if (!latText || !lonText) {
-          alert("أدخل الإحداثيات بالدرجات");
-          return;
-        }
-
         const lat = dmsToDecimal(latText);
         const lon = dmsToDecimal(lonText);
 
         if (isNaN(lat) || isNaN(lon)) {
-          alert("صيغة DMS غير صحيحة");
+          alert("صيغة الدرجات غير صحيحة");
           return;
         }
 
         document.getElementById("latDecimal").value = lat.toFixed(6);
         document.getElementById("lonDecimal").value = lon.toFixed(6);
-
-        goToLatLon(lat, lon, "الإحداثيات بالدرجات");
+        goToLatLon(lat, lon, "الدرجات");
       };
 
       window.searchUTM = async function () {
@@ -339,7 +305,7 @@
         const zone = parseInt(document.getElementById("zone").value);
 
         if (isNaN(easting) || isNaN(northing) || isNaN(zone)) {
-          alert("أدخل قيم UTM بشكل صحيح");
+          alert("أدخل الإحداثيات المترية بشكل صحيح");
           return;
         }
 
@@ -362,7 +328,7 @@
         document.getElementById("latDecimal").value = lat.toFixed(6);
         document.getElementById("lonDecimal").value = lon.toFixed(6);
 
-        goToLatLon(lat, lon, "الإحداثيات المترية UTM");
+        goToLatLon(lat, lon, "المتري");
       };
 
       function goToLatLon(lat, lon, sourceName) {
@@ -378,7 +344,6 @@
           geometry: point,
           symbol: {
             type: "simple-marker",
-            style: "circle",
             color: [220, 38, 38, 0.95],
             size: 12,
             outline: {
@@ -399,16 +364,13 @@
           title: "الموقع المدخل",
           content:
             "<b>Latitude:</b> " + lat.toFixed(6) + "<br>" +
-            "<b>Longitude:</b> " + lon.toFixed(6) + "<br>" +
-            "<b>DMS:</b> " + decimalToDMS(lat, true) + " , " + decimalToDMS(lon, false),
+            "<b>Longitude:</b> " + lon.toFixed(6),
           location: point
         });
 
         document.getElementById("result").innerHTML =
-          "<strong>تم البحث بواسطة:</strong> " + sourceName + "<br>" +
-          "<strong>Decimal:</strong> " + lat.toFixed(6) + ", " + lon.toFixed(6) + "<br>" +
-          "<strong>DMS:</strong> " + decimalToDMS(lat, true) + " , " + decimalToDMS(lon, false) + "<br>" +
-          '<strong>Google Maps:</strong> <a target="_blank" href="https://www.google.com/maps?q=' + lat + ',' + lon + '">فتح الموقع</a>';
+          "<b>تم البحث بواسطة:</b> " + sourceName + "<br>" +
+          "<b>Decimal:</b> " + lat.toFixed(6) + ", " + lon.toFixed(6);
       }
 
       window.clearInputs = function () {
@@ -424,7 +386,7 @@
         view.popup.close();
 
         document.getElementById("result").innerHTML =
-          "أدخل الإحداثيات بأي صيغة، أو اضغط على أي خط داخل الخريطة لعرض البيانات.";
+          "اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.";
 
         featureLayer.when(function () {
           view.goTo(featureLayer.fullExtent).catch(function () {});
@@ -435,17 +397,9 @@
         return (v === null || v === undefined || v === "") ? "-" : v;
       }
 
-      function formatDate(v) {
-        if (!v) return "-";
-        const d = new Date(v);
-        if (isNaN(d.getTime())) return v;
-        return d.toLocaleString("ar-SA");
-      }
-
       function dmsToDecimal(dms) {
         const regex = /(\d+)[°\s]+(\d+)?['\s]*([\d.]+)?["\s]*([NSEW])/i;
         const match = dms.match(regex);
-
         if (!match) return NaN;
 
         let deg = parseFloat(match[1]) || 0;
@@ -454,26 +408,8 @@
         let dir = match[4].toUpperCase();
 
         let dec = deg + (min / 60) + (sec / 3600);
-
-        if (dir === "S" || dir === "W") {
-          dec *= -1;
-        }
-
+        if (dir === "S" || dir === "W") dec *= -1;
         return dec;
-      }
-
-      function decimalToDMS(decimal, isLat) {
-        const dir = decimal >= 0
-          ? (isLat ? "N" : "E")
-          : (isLat ? "S" : "W");
-
-        const abs = Math.abs(decimal);
-        const deg = Math.floor(abs);
-        const minFloat = (abs - deg) * 60;
-        const min = Math.floor(minFloat);
-        const sec = ((minFloat - min) * 60).toFixed(2);
-
-        return deg + "°" + min + "'" + sec + '"' + dir;
       }
     });
   </script>
