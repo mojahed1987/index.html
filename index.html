@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>طلبات فك الحظر</title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+  <script src="https://js.arcgis.com/4.30/"></script>
+
+  <style>
+    html, body {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f5f7fa;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      height: 100vh;
+    }
+
+    .sidebar {
+      background: #ffffff;
+      border-left: 1px solid #d9e2ec;
+      padding: 18px;
+      overflow-y: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: bold;
+      color: #0b5cab;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+
+    .card {
+      background: #f9fbfd;
+      border: 1px solid #dbe4ee;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .card h3 {
+      margin: 0 0 12px 0;
+      color: #1f2937;
+      font-size: 18px;
+    }
+
+    label {
+      display: block;
+      margin: 8px 0 4px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #374151;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #0b5cab;
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #08498a;
+    }
+
+    .secondary {
+      background: #64748b;
+    }
+
+    .secondary:hover {
+      background: #475569;
+    }
+
+    .result {
+      background: #eef6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.9;
+      color: #1e3a8a;
+    }
+
+    #viewDiv {
+      height: 100%;
+      width: 100%;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 10px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+      .sidebar {
+        border-left: none;
+        border-bottom: 1px solid #d9e2ec;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <div class="title">طلبات فك الحظر</div>
+
+      <div class="card">
+        <h3>البحث بالإحداثيات العشرية</h3>
+        <label>Latitude</label>
+        <input id="latDecimal" type="number" step="any" placeholder="مثال: 24.7136" />
+
+        <label>Longitude</label>
+        <input id="lonDecimal" type="number" step="any" placeholder="مثال: 46.6753" />
+
+        <button onclick="searchDecimal()">بحث بالعشري</button>
+      </div>
+
+      <div class="card">
+        <h3>البحث بالإحداثيات بالدرجات</h3>
+        <label>Latitude DMS</label>
+        <input id="latDMS" type="text" placeholder='مثال: 24°42\'49"N' />
+
+        <label>Longitude DMS</label>
+        <input id="lonDMS" type="text" placeholder='مثال: 46°40\'31"E' />
+
+        <button onclick="searchDMS()">بحث بالدرجات</button>
+      </div>
+
+      <div class="card">
+        <h3>البحث بالإحداثيات المترية UTM</h3>
+        <label>Easting</label>
+        <input id="easting" type="number" step="any" placeholder="مثال: 671000" />
+
+        <label>Northing</label>
+        <input id="northing" type="number" step="any" placeholder="مثال: 2734000" />
+
+        <label>Zone</label>
+        <input id="zone" type="number" value="38" />
+
+        <button onclick="searchUTM()">بحث بالمتري</button>
+      </div>
+
+      <div class="card">
+        <button class="secondary" onclick="clearInputs()">مسح الحقول</button>
+        <div class="note">
+          الخريطة تستخدم طبقة ArcGIS مباشرة. عند البحث سيتم وضع نقطة على الخريطة والانتقال للموقع.
+        </div>
+      </div>
+
+      <div class="result" id="result">
+        أدخل الإحداثيات بأي صيغة، وسيتم تحويلها وعرضها على الخريطة.
+      </div>
+    </div>
+
+    <div id="viewDiv"></div>
+  </div>
+
+  <script>
+    let view, graphicsLayer, pointGraphic;
+
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/geometry/Point",
+      "esri/geometry/SpatialReference",
+      "esri/geometry/support/webMercatorUtils",
+      "esri/geometry/projection"
+    ], function (
+      Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Point,
+      SpatialReference, webMercatorUtils, projection
+    ) {
+
+      const featureLayer = new FeatureLayer({
+        url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/Unblock18_4_2026/FeatureServer/0",
+        outFields: ["*"],
+        popupEnabled: true
+      });
+
+      graphicsLayer = new GraphicsLayer();
+
+      const map = new Map({
+        basemap: "streets-navigation-vector",
+        layers: [featureLayer, graphicsLayer]
+      });
+
+      view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [46.6753, 24.7136],
+        zoom: 10
+      });
+
+      window.searchDecimal = function () {
+        const lat = parseFloat(document.getElementById("latDecimal").value);
+        const lon = parseFloat(document.getElementById("lonDecimal").value);
+
+        if (isNaN(lat) || isNaN(lon)) {
+          alert("أدخل Latitude و Longitude بشكل صحيح");
+          return;
+        }
+
+        goToLatLon(lat, lon, "الإحداثيات العشرية");
+      };
+
+      window.searchDMS = function () {
+        const latText = document.getElementById("latDMS").value.trim();
+        const lonText = document.getElementById("lonDMS").value.trim();
+
+        if (!latText || !lonText) {
+          alert("أدخل الإحداثيات بالدرجات");
+          return;
+        }
+
+        const lat = dmsToDecimal(latText);
+        const lon = dmsToDecimal(lonText);
+
+        if (isNaN(lat) || isNaN(lon)) {
+          alert("صيغة DMS غير صحيحة");
+          return;
+        }
+
+        document.getElementById("latDecimal").value = lat.toFixed(6);
+        document.getElementById("lonDecimal").value = lon.toFixed(6);
+
+        goToLatLon(lat, lon, "الإحداثيات بالدرجات");
+      };
+
+      window.searchUTM = async function () {
+        const easting = parseFloat(document.getElementById("easting").value);
+        const northing = parseFloat(document.getElementById("northing").value);
+        const zone = parseInt(document.getElementById("zone").value);
+
+        if (isNaN(easting) || isNaN(northing) || isNaN(zone)) {
+          alert("أدخل قيم UTM بشكل صحيح");
+          return;
+        }
+
+        await projection.load();
+
+        const utmPoint = new Point({
+          x: easting,
+          y: northing,
+          spatialReference: new SpatialReference({ wkid: 32600 + zone })
+        });
+
+        const geoPoint = projection.project(
+          utmPoint,
+          new SpatialReference({ wkid: 4326 })
+        );
+
+        const lat = geoPoint.y;
+        const lon = geoPoint.x;
+
+        document.getElementById("latDecimal").value = lat.toFixed(6);
+        document.getElementById("lonDecimal").value = lon.toFixed(6);
+
+        goToLatLon(lat, lon, "الإحداثيات المترية UTM");
+      };
+
+      function goToLatLon(lat, lon, sourceName) {
+        const point = new Point({
+          longitude: lon,
+          latitude: lat,
+          spatialReference: { wkid: 4326 }
+        });
+
+        graphicsLayer.removeAll();
+
+        pointGraphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: [220, 38, 38, 0.95],
+            size: 12,
+            outline: {
+              color: [255, 255, 255],
+              width: 2
+            }
+          },
+          attributes: {
+            title: "الموقع المدخل"
+          },
+          popupTemplate: {
+            title: "{title}",
+            content: `
+              <b>Latitude:</b> ${lat.toFixed(6)}<br>
+              <b>Longitude:</b> ${lon.toFixed(6)}<br>
+              <b>DMS:</b> ${decimalToDMS(lat, true)} , ${decimalToDMS(lon, false)}
+            `
+          }
+        });
+
+        graphicsLayer.add(pointGraphic);
+
+        view.goTo({
+          target: point,
+          zoom: 16
+        });
+
+        document.getElementById("result").innerHTML = `
+          <strong>تم البحث بواسطة:</strong> ${sourceName}<br>
+          <strong>Decimal:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+          <strong>DMS:</strong> ${decimalToDMS(lat, true)} , ${decimalToDMS(lon, false)}<br>
+          <strong>Google Maps:</strong>
+          <a target="_blank" href="https://www.google.com/maps?q=${lat},${lon}">فتح الموقع</a>
+        `;
+      }
+
+      window.clearInputs = function () {
+        document.getElementById("latDecimal").value = "";
+        document.getElementById("lonDecimal").value = "";
+        document.getElementById("latDMS").value = "";
+        document.getElementById("lonDMS").value = "";
+        document.getElementById("easting").value = "";
+        document.getElementById("northing").value = "";
+        document.getElementById("zone").value = "38";
+
+        graphicsLayer.removeAll();
+
+        document.getElementById("result").innerHTML =
+          "أدخل الإحداثيات بأي صيغة، وسيتم تحويلها وعرضها على الخريطة.";
+
+        view.goTo({
+          center: [46.6753, 24.7136],
+          zoom: 10
+        });
+      };
+
+      function dmsToDecimal(dms) {
+        const regex = /(\d+)[°\s]+(\d+)?['\s]*([\d.]+)?["\s]*([NSEW])/i;
+        const match = dms.match(regex);
+        if (!match) return NaN;
+
+        let deg = parseFloat(match[1]) || 0;
+        let min = parseFloat(match[2]) || 0;
+        let sec = parseFloat(match[3]) || 0;
+        let dir = match[4].toUpperCase();
+
+        let dec = deg + (min / 60) + (sec / 3600);
+        if (dir === "S" || dir === "W") dec *= -1;
+
+        return dec;
+      }
+
+      function decimalToDMS(decimal, isLat) {
+        const dir = decimal >= 0 ? (isLat ? "N" : "E") : (isLat ? "S" : "W");
+        const abs = Math.abs(decimal);
+        const deg = Math.floor(abs);
+        const minFloat = (abs - deg) * 60;
+        const min = Math.floor(minFloat);
+        const sec = ((minFloat - min) * 60).toFixed(2);
+
+        return `${deg}°${min}'${sec}"${dir}`;
+      }
+    });
+  </script>
+</body>
+</html>
