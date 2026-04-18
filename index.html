@@ -186,7 +186,7 @@
       <div class="card">
         <button class="secondary" onclick="clearInputs()">مسح الحقول</button>
         <div class="note">
-          يمكنك الضغط على أي خط داخل الخريطة لإظهار بياناته.
+          اضغط مباشرة على أي خط داخل الخريطة لإظهار البيانات.
         </div>
       </div>
 
@@ -199,7 +199,7 @@
   </div>
 
   <script>
-    let view, graphicsLayer;
+    let view, graphicsLayer, featureLayer;
 
     require([
       "esri/Map",
@@ -221,45 +221,17 @@
       projection
     ) {
 
-      const featureLayer = new FeatureLayer({
+      featureLayer = new FeatureLayer({
         url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/ArcGIS/rest/services/Unblock18_4_2026/FeatureServer/0",
         outFields: ["*"],
-        popupEnabled: true,
+        popupEnabled: false,
         renderer: {
           type: "simple",
           symbol: {
             type: "simple-line",
-            color: [255, 0, 0, 0.9],
-            width: 3
+            color: [255, 0, 0, 1],
+            width: 5
           }
-        },
-        popupTemplate: {
-          title: "طلب فك الحظر - {RequestID}",
-          content: [
-            {
-              type: "fields",
-              fieldInfos: [
-                { fieldName: "RequestID", label: "رقم الطلب" },
-                { fieldName: "BlockingId", label: "رقم الحظر" },
-                { fieldName: "ContractorName", label: "المقاول" },
-                { fieldName: "OwnerEntity", label: "الجهة المالكة" },
-                { fieldName: "StreetName", label: "اسم الشارع" },
-                { fieldName: "SubServiceType", label: "نوع الخدمة الفرعية" },
-                { fieldName: "PathLength", label: "طول المسار" },
-                { fieldName: "PathWidth", label: "عرض المسار" },
-                { fieldName: "PathDepth", label: "عمق المسار" },
-                { fieldName: "StreetWidth", label: "عرض الشارع" },
-                { fieldName: "PermitReqNum", label: "رقم طلب إصدار الرخصة" },
-                {
-                  fieldName: "PermitRequestDate",
-                  label: "تاريخ إصدار الرخصة",
-                  format: {
-                    dateFormat: "short-date-short-time"
-                  }
-                }
-              ]
-            }
-          ]
         }
       });
 
@@ -273,21 +245,57 @@
       view = new MapView({
         container: "viewDiv",
         map: map,
-        center: [46.6753, 24.7136],
-        zoom: 10,
         popup: {
           dockEnabled: true,
           dockOptions: {
             buttonEnabled: true,
             breakpoint: false,
             position: "top-right"
-          },
-          defaultPopupTemplateEnabled: true
+          }
         }
       });
 
       featureLayer.when(function () {
         view.goTo(featureLayer.fullExtent).catch(function () {});
+      });
+
+      view.when(function () {
+        view.on("click", function(event) {
+          view.hitTest(event).then(function(response) {
+            const results = response.results.filter(function(r) {
+              return r.graphic &&
+                     r.graphic.layer &&
+                     r.graphic.layer === featureLayer;
+            });
+
+            if (results.length > 0) {
+              const g = results[0].graphic;
+              const a = g.attributes || {};
+
+              const content =
+                "<b>رقم الطلب:</b> " + safeVal(a.RequestID) + "<br>" +
+                "<b>رقم الحظر:</b> " + safeVal(a.BlockingId) + "<br>" +
+                "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
+                "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
+                "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
+                "<b>نوع الخدمة الفرعية:</b> " + safeVal(a.SubServiceType) + "<br>" +
+                "<b>طول المسار:</b> " + safeVal(a.PathLength) + "<br>" +
+                "<b>عرض المسار:</b> " + safeVal(a.PathWidth) + "<br>" +
+                "<b>عمق المسار:</b> " + safeVal(a.PathDepth) + "<br>" +
+                "<b>عرض الشارع:</b> " + safeVal(a.StreetWidth) + "<br>" +
+                "<b>رقم طلب إصدار الرخصة:</b> " + safeVal(a.PermitReqNum) + "<br>" +
+                "<b>تاريخ إصدار الرخصة:</b> " + formatDate(a.PermitRequestDate);
+
+              view.popup.open({
+                title: "طلب فك الحظر - " + safeVal(a.RequestID),
+                content: content,
+                location: event.mapPoint
+              });
+
+              document.getElementById("result").innerHTML = content;
+            }
+          });
+        });
       });
 
       window.searchDecimal = function () {
@@ -377,13 +385,6 @@
               color: [255, 255, 255],
               width: 2
             }
-          },
-          popupTemplate: {
-            title: "الموقع المدخل",
-            content:
-              "<b>Latitude:</b> " + lat.toFixed(6) + "<br>" +
-              "<b>Longitude:</b> " + lon.toFixed(6) + "<br>" +
-              "<b>DMS:</b> " + decimalToDMS(lat, true) + " , " + decimalToDMS(lon, false)
           }
         });
 
@@ -420,16 +421,26 @@
         document.getElementById("zone").value = "38";
 
         graphicsLayer.removeAll();
+        view.popup.close();
 
         document.getElementById("result").innerHTML =
           "أدخل الإحداثيات بأي صيغة، أو اضغط على أي خط داخل الخريطة لعرض البيانات.";
-
-        view.popup.close();
 
         featureLayer.when(function () {
           view.goTo(featureLayer.fullExtent).catch(function () {});
         });
       };
+
+      function safeVal(v) {
+        return (v === null || v === undefined || v === "") ? "-" : v;
+      }
+
+      function formatDate(v) {
+        if (!v) return "-";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return v;
+        return d.toLocaleString("ar-SA");
+      }
 
       function dmsToDecimal(dms) {
         const regex = /(\d+)[°\s]+(\d+)?['\s]*([\d.]+)?["\s]*([NSEW])/i;
