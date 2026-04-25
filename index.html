@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>طلبات فك الحظر</title>
@@ -84,10 +83,20 @@
       color: white;
       font-size: 14px;
       cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
     }
 
     .secondary {
       background: #64748b;
+    }
+
+    .green {
+      background: #15803d;
+    }
+
+    .orange {
+      background: #c2410c;
     }
 
     .result {
@@ -100,6 +109,8 @@
       color: #1e3a8a;
       margin-top: 10px;
       word-break: break-word;
+      max-height: 220px;
+      overflow-y: auto;
     }
 
     #viewDiv {
@@ -146,6 +157,15 @@
   <div class="panel">
 
     <div class="card">
+      <h3>البحث باسم الشارع أو المقاول</h3>
+      <label>اسم الشارع أو المقاول</label>
+      <input id="textSearch" type="text" placeholder="مثال: طريق الملك فهد أو اسم المقاول" />
+      <button onclick="searchByText()">بحث</button>
+      <button class="green" onclick="downloadExcel()">تحميل Excel من البيانات</button>
+      <button class="orange" onclick="locateUser()">معرفة موقعي على الخريطة</button>
+    </div>
+
+    <div class="card">
       <h3>البحث العشري</h3>
       <label>Latitude</label>
       <input id="latDecimal" type="number" step="any" placeholder="24.7136" />
@@ -159,16 +179,21 @@
 
     <div class="card">
       <h3>البحث بالدرجات</h3>
-      <input id="latDMS" placeholder='24°42\'49"N' />
-      <input id="lonDMS" placeholder='46°40\'31"E' />
+      <label>Latitude DMS</label>
+      <input id="latDMS" type="text" placeholder='24°42&apos;49"N' />
+      <label>Longitude DMS</label>
+      <input id="lonDMS" type="text" placeholder='46°40&apos;31"E' />
       <button onclick="searchDMS()">بحث بالدرجات</button>
     </div>
 
     <div class="card">
       <h3>البحث المتري UTM</h3>
-      <input id="easting" placeholder="671000" />
-      <input id="northing" placeholder="2734000" />
-      <input id="zone" value="38" />
+      <label>Easting</label>
+      <input id="easting" type="number" step="any" placeholder="671000" />
+      <label>Northing</label>
+      <input id="northing" type="number" step="any" placeholder="2734000" />
+      <label>Zone</label>
+      <input id="zone" type="number" value="38" />
       <button onclick="searchUTM()">بحث بالمتري</button>
     </div>
 
@@ -176,106 +201,412 @@
       اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.
     </div>
 
+    <div class="note">
+      ملاحظة: زر موقعي يحتاج تشغيل GPS والسماح للمتصفح بالوصول للموقع.
+    </div>
+
   </div>
 
   <div id="viewDiv"></div>
 
 <script>
+  let view, graphicsLayer, featureLayer;
+  let lastSearchFeatures = [];
 
-require([
-  "esri/Map",
-  "esri/views/MapView",
-  "esri/layers/FeatureLayer",
-  "esri/layers/GraphicsLayer",
-  "esri/Graphic",
-  "esri/geometry/Point",
-  "esri/geometry/SpatialReference",
-  "esri/geometry/projection"
-], function (Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Point, SpatialReference, projection) {
+  require([
+    "esri/Map",
+    "esri/views/MapView",
+    "esri/layers/FeatureLayer",
+    "esri/layers/GraphicsLayer",
+    "esri/Graphic",
+    "esri/geometry/Point",
+    "esri/geometry/SpatialReference",
+    "esri/geometry/projection"
+  ], function (
+    Map,
+    MapView,
+    FeatureLayer,
+    GraphicsLayer,
+    Graphic,
+    Point,
+    SpatialReference,
+    projection
+  ) {
 
-  const featureLayer = new FeatureLayer({
-    url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/ArcGIS/rest/services/Unblock18_4_2026/FeatureServer/0",
-    outFields: ["*"],
-    popupEnabled: false
-  });
-
-  const graphicsLayer = new GraphicsLayer();
-
-  const map = new Map({
-    basemap: "streets-navigation-vector",
-    layers: [featureLayer, graphicsLayer]
-  });
-
-  const view = new MapView({
-    container: "viewDiv",
-    map: map
-  });
-
-  view.on("click", function(event){
-    view.hitTest(event).then(function(response){
-      if(response.results.length > 0){
-        const a = response.results[0].graphic.attributes;
-
-        const content =
-          "<b>رقم الطلب:</b> " + a.RequestID + "<br>" +
-          "<b>المقاول:</b> " + a.ContractorName + "<br>" +
-          "<b>الشارع:</b> " + a.StreetName;
-
-        document.getElementById("result").innerHTML = content;
+    featureLayer = new FeatureLayer({
+      url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/ArcGIS/rest/services/Unblock18_4_2026/FeatureServer/0",
+      outFields: ["*"],
+      popupEnabled: false,
+      renderer: {
+        type: "simple",
+        symbol: {
+          type: "simple-line",
+          color: [255, 0, 0, 1],
+          width: 6
+        }
       }
     });
-  });
 
-  window.searchDecimal = function () {
-    const lat = parseFloat(document.getElementById("latDecimal").value);
-    const lon = parseFloat(document.getElementById("lonDecimal").value);
-    view.goTo({ center: [lon, lat], zoom: 15 });
-  };
+    graphicsLayer = new GraphicsLayer();
 
-  window.searchDMS = function () {
-    alert("استخدم البحث العشري أو المتري حالياً");
-  };
-
-  window.searchUTM = async function () {
-    await projection.load();
-
-    const e = parseFloat(document.getElementById("easting").value);
-    const n = parseFloat(document.getElementById("northing").value);
-    const z = parseInt(document.getElementById("zone").value);
-
-    const utm = new Point({
-      x: e,
-      y: n,
-      spatialReference: new SpatialReference({ wkid: 32600 + z })
+    const map = new Map({
+      basemap: "streets-navigation-vector",
+      layers: [featureLayer, graphicsLayer]
     });
 
-    const geo = projection.project(utm, new SpatialReference({ wkid: 4326 }));
+    view = new MapView({
+      container: "viewDiv",
+      map: map,
+      popup: {
+        dockEnabled: true,
+        dockOptions: {
+          breakpoint: false,
+          position: "top-right"
+        }
+      }
+    });
 
-    view.goTo({ center: [geo.x, geo.y], zoom: 15 });
-  };
+    featureLayer.when(function () {
+      view.goTo(featureLayer.fullExtent).catch(function () {});
+    });
 
-  window.clearInputs = function () {
-    document.getElementById("latDecimal").value = "";
-    document.getElementById("lonDecimal").value = "";
-    document.getElementById("latDMS").value = "";
-    document.getElementById("lonDMS").value = "";
-    document.getElementById("easting").value = "";
-    document.getElementById("northing").value = "";
-  };
+    view.when(function () {
+      view.on("click", function(event) {
+        view.hitTest(event).then(function(response) {
+          const results = response.results.filter(function(r) {
+            return r.graphic && r.graphic.layer === featureLayer;
+          });
 
-});
+          if (results.length > 0) {
+            showFeatureInfo(results[0].graphic, event.mapPoint);
+          }
+        });
+      });
+    });
 
-// 🔥 إضافة التاريخ تلقائي
-(function () {
-  const today = new Date();
-  const d = String(today.getDate()).padStart(2, '0');
-  const m = String(today.getMonth()+1).padStart(2, '0');
-  const y = today.getFullYear();
+    window.searchByText = async function () {
+      const keyword = document.getElementById("textSearch").value.trim();
 
-  document.getElementById("headerTitle").innerHTML =
-    "طلبات فك الحظر - " + d + "-" + m + "-" + y;
-})();
+      if (!keyword) {
+        alert("أدخل اسم الشارع أو المقاول");
+        return;
+      }
 
+      const safeKeyword = keyword.replace(/'/g, "''");
+
+      const query = featureLayer.createQuery();
+      query.where =
+        "UPPER(StreetName) LIKE UPPER('%" + safeKeyword + "%')" +
+        " OR UPPER(ContractorName) LIKE UPPER('%" + safeKeyword + "%')";
+      query.outFields = ["*"];
+      query.returnGeometry = true;
+
+      try {
+        const result = await featureLayer.queryFeatures(query);
+        lastSearchFeatures = result.features || [];
+
+        if (lastSearchFeatures.length === 0) {
+          document.getElementById("result").innerHTML = "لم يتم العثور على نتائج.";
+          return;
+        }
+
+        graphicsLayer.removeAll();
+
+        lastSearchFeatures.forEach(function(feature) {
+          const highlightGraphic = feature.clone();
+          highlightGraphic.symbol = {
+            type: "simple-line",
+            color: [0, 102, 255, 1],
+            width: 7
+          };
+          graphicsLayer.add(highlightGraphic);
+        });
+
+        view.goTo(lastSearchFeatures.map(f => f.geometry)).catch(function () {});
+
+        let html = "<b>عدد النتائج:</b> " + lastSearchFeatures.length + "<br><hr>";
+
+        lastSearchFeatures.slice(0, 20).forEach(function(feature, index) {
+          const a = feature.attributes || {};
+          html +=
+            "<b>" + (index + 1) + ".</b> " +
+            "طلب: " + safeVal(a.RequestID) +
+            " | المقاول: " + safeVal(a.ContractorName) +
+            " | الشارع: " + safeVal(a.StreetName) +
+            "<br>";
+        });
+
+        if (lastSearchFeatures.length > 20) {
+          html += "<br>تم عرض أول 20 نتيجة فقط في القائمة، ويمكن تحميل الكل من زر Excel.";
+        }
+
+        document.getElementById("result").innerHTML = html;
+
+      } catch (error) {
+        console.error(error);
+        alert("حدث خطأ في البحث. تأكد من أسماء الحقول في الطبقة.");
+      }
+    };
+
+    window.downloadExcel = async function () {
+      let features = lastSearchFeatures;
+
+      if (!features || features.length === 0) {
+        const query = featureLayer.createQuery();
+        query.where = "1=1";
+        query.outFields = ["*"];
+        query.returnGeometry = false;
+
+        const result = await featureLayer.queryFeatures(query);
+        features = result.features || [];
+      }
+
+      if (features.length === 0) {
+        alert("لا توجد بيانات للتحميل");
+        return;
+      }
+
+      const columns = [
+        "RequestID",
+        "BlockingId",
+        "ContractorName",
+        "StreetName",
+        "OwnerEntity",
+        "SubServiceType"
+      ];
+
+      let csv = "\uFEFF";
+      csv += columns.join(",") + "\n";
+
+      features.forEach(function(feature) {
+        const a = feature.attributes || {};
+        const row = columns.map(function(col) {
+          return csvSafe(a[col]);
+        });
+        csv += row.join(",") + "\n";
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "طلبات_فك_الحظر.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      URL.revokeObjectURL(url);
+    };
+
+    window.locateUser = function () {
+      if (!navigator.geolocation) {
+        alert("المتصفح لا يدعم تحديد الموقع");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          goToLatLon(lat, lon, "موقع المستخدم الحالي");
+
+          document.getElementById("result").innerHTML =
+            "<b>موقعك الحالي:</b><br>" +
+            "<b>Latitude:</b> " + lat.toFixed(6) + "<br>" +
+            "<b>Longitude:</b> " + lon.toFixed(6);
+        },
+        function(error) {
+          alert("لم يتم تحديد الموقع. تأكد من السماح للموقع GPS.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    };
+
+    window.searchDecimal = function () {
+      const lat = parseFloat(document.getElementById("latDecimal").value);
+      const lon = parseFloat(document.getElementById("lonDecimal").value);
+
+      if (isNaN(lat) || isNaN(lon)) {
+        alert("أدخل الإحداثيات العشرية بشكل صحيح");
+        return;
+      }
+
+      goToLatLon(lat, lon, "العشري");
+    };
+
+    window.searchDMS = function () {
+      const latText = document.getElementById("latDMS").value.trim();
+      const lonText = document.getElementById("lonDMS").value.trim();
+
+      const lat = dmsToDecimal(latText);
+      const lon = dmsToDecimal(lonText);
+
+      if (isNaN(lat) || isNaN(lon)) {
+        alert("صيغة الدرجات غير صحيحة");
+        return;
+      }
+
+      document.getElementById("latDecimal").value = lat.toFixed(6);
+      document.getElementById("lonDecimal").value = lon.toFixed(6);
+
+      goToLatLon(lat, lon, "الدرجات");
+    };
+
+    window.searchUTM = async function () {
+      const easting = parseFloat(document.getElementById("easting").value);
+      const northing = parseFloat(document.getElementById("northing").value);
+      const zone = parseInt(document.getElementById("zone").value);
+
+      if (isNaN(easting) || isNaN(northing) || isNaN(zone)) {
+        alert("أدخل الإحداثيات المترية بشكل صحيح");
+        return;
+      }
+
+      await projection.load();
+
+      const utmPoint = new Point({
+        x: easting,
+        y: northing,
+        spatialReference: new SpatialReference({ wkid: 32600 + zone })
+      });
+
+      const geoPoint = projection.project(
+        utmPoint,
+        new SpatialReference({ wkid: 4326 })
+      );
+
+      const lat = geoPoint.y;
+      const lon = geoPoint.x;
+
+      document.getElementById("latDecimal").value = lat.toFixed(6);
+      document.getElementById("lonDecimal").value = lon.toFixed(6);
+
+      goToLatLon(lat, lon, "المتري");
+    };
+
+    window.clearInputs = function () {
+      document.getElementById("latDecimal").value = "";
+      document.getElementById("lonDecimal").value = "";
+      document.getElementById("latDMS").value = "";
+      document.getElementById("lonDMS").value = "";
+      document.getElementById("easting").value = "";
+      document.getElementById("northing").value = "";
+      document.getElementById("zone").value = "38";
+      document.getElementById("textSearch").value = "";
+
+      lastSearchFeatures = [];
+      graphicsLayer.removeAll();
+      view.popup.close();
+
+      document.getElementById("result").innerHTML =
+        "اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.";
+
+      featureLayer.when(function () {
+        view.goTo(featureLayer.fullExtent).catch(function () {});
+      });
+    };
+
+    function goToLatLon(lat, lon, sourceName) {
+      const point = new Point({
+        longitude: lon,
+        latitude: lat,
+        spatialReference: { wkid: 4326 }
+      });
+
+      graphicsLayer.removeAll();
+
+      const pointGraphic = new Graphic({
+        geometry: point,
+        symbol: {
+          type: "simple-marker",
+          color: [220, 38, 38, 0.95],
+          size: 14,
+          outline: {
+            color: [255, 255, 255],
+            width: 2
+          }
+        }
+      });
+
+      graphicsLayer.add(pointGraphic);
+
+      view.goTo({
+        target: point,
+        zoom: 17
+      });
+
+      view.popup.open({
+        title: sourceName,
+        content:
+          "<b>Latitude:</b> " + lat.toFixed(6) + "<br>" +
+          "<b>Longitude:</b> " + lon.toFixed(6),
+        location: point
+      });
+    }
+
+    function showFeatureInfo(graphic, location) {
+      const a = graphic.attributes || {};
+
+      const content =
+        "<b>رقم الطلب:</b> " + safeVal(a.RequestID) + "<br>" +
+        "<b>رقم الحظر:</b> " + safeVal(a.BlockingId) + "<br>" +
+        "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
+        "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
+        "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
+        "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType);
+
+      view.popup.open({
+        title: "طلب فك الحظر - " + safeVal(a.RequestID),
+        content: content,
+        location: location
+      });
+
+      document.getElementById("result").innerHTML = content;
+    }
+
+    function safeVal(v) {
+      return (v === null || v === undefined || v === "") ? "-" : v;
+    }
+
+    function csvSafe(v) {
+      if (v === null || v === undefined) return '""';
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    }
+
+    function dmsToDecimal(dms) {
+      const regex = /(\d+)[°\s]+(\d+)?['\s]*([\d.]+)?["\s]*([NSEW])/i;
+      const match = dms.match(regex);
+      if (!match) return NaN;
+
+      let deg = parseFloat(match[1]) || 0;
+      let min = parseFloat(match[2]) || 0;
+      let sec = parseFloat(match[3]) || 0;
+      let dir = match[4].toUpperCase();
+
+      let dec = deg + (min / 60) + (sec / 3600);
+      if (dir === "S" || dir === "W") dec *= -1;
+
+      return dec;
+    }
+
+  });
+
+  // إضافة تاريخ اليوم للعنوان
+  (function () {
+    const today = new Date();
+    const d = String(today.getDate()).padStart(2, "0");
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const y = today.getFullYear();
+
+    document.getElementById("headerTitle").innerHTML =
+      "طلبات فك الحظر - " + d + "-" + m + "-" + y;
+  })();
 </script>
 
 </body>
