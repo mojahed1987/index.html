@@ -1,17 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XF7KB3RJVW"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-XF7KB3RJVW');
-</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>طلبات فك الحظر</title>
 
   <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
@@ -20,407 +11,138 @@
   <style>
     html, body {
       margin: 0;
-      padding: 0;
       height: 100%;
-      font-family: Tahoma, Arial, sans-serif;
+      font-family: Tahoma;
       background: #f5f7fa;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
     }
 
     .header {
       background: #0b5cab;
       color: white;
       text-align: center;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
-      padding: 14px 10px;
+      padding: 12px;
     }
 
     .panel {
       background: white;
-      padding: 12px;
-      border-bottom: 1px solid #d9e2ec;
+      padding: 10px;
     }
 
     .card {
       background: #f9fbfd;
       border: 1px solid #dbe4ee;
-      border-radius: 12px;
-      padding: 12px;
+      border-radius: 10px;
+      padding: 10px;
       margin-bottom: 10px;
-    }
-
-    .card h3 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-      color: #1f2937;
-    }
-
-    label {
-      display: block;
-      margin: 8px 0 4px;
-      font-size: 13px;
-      font-weight: bold;
     }
 
     input {
       width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 14px;
-      background: white;
-    }
-
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 10px;
+      padding: 8px;
+      margin-top: 5px;
+      margin-bottom: 5px;
     }
 
     button {
-      padding: 11px;
-      border: none;
-      border-radius: 8px;
+      width: 100%;
+      padding: 10px;
       background: #0b5cab;
       color: white;
-      font-size: 14px;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
     }
 
-    .secondary {
-      background: #64748b;
-    }
-
-    .result {
-      background: #eef6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 13px;
-      line-height: 1.8;
-      color: #1e3a8a;
-      margin-top: 10px;
-      word-break: break-word;
-    }
-
     #viewDiv {
-      flex: 1;
-      min-height: 55vh;
-      width: 100%;
-    }
-
-    .note {
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 1.7;
-      margin-top: 8px;
-    }
-
-    @media (min-width: 900px) {
-      body {
-        display: grid;
-        grid-template-columns: 380px 1fr;
-        grid-template-rows: auto 1fr;
-      }
-
-      .header {
-        grid-column: 1 / 3;
-      }
-
-      .panel {
-        border-left: 1px solid #d9e2ec;
-        border-bottom: none;
-        overflow-y: auto;
-      }
-
-      #viewDiv {
-        min-height: calc(100vh - 60px);
-      }
+      height: 60vh;
     }
   </style>
 </head>
+
 <body>
-  <div class="header">طلبات فك الحظر</div>
 
-  <div class="panel">
-    <div class="card">
-      <h3>البحث العشري</h3>
-      <label>Latitude</label>
-      <input id="latDecimal" type="number" step="any" placeholder="24.7136" />
-      <label>Longitude</label>
-      <input id="lonDecimal" type="number" step="any" placeholder="46.6753" />
-      <div class="btn-row">
-        <button onclick="searchDecimal()">بحث</button>
-        <button class="secondary" onclick="clearInputs()">مسح</button>
-      </div>
-    </div>
+<div class="header" id="headerTitle">طلبات فك الحظر</div>
 
-    <div class="card">
-      <h3>البحث بالدرجات</h3>
-      <label>Latitude DMS</label>
-      <input id="latDMS" type="text" placeholder='24°42&apos;49"N' />
-      <label>Longitude DMS</label>
-      <input id="lonDMS" type="text" placeholder='46°40&apos;31"E' />
-      <button onclick="searchDMS()">بحث بالدرجات</button>
-    </div>
+<div class="panel">
 
-    <div class="card">
-      <h3>البحث المتري UTM</h3>
-      <label>Easting</label>
-      <input id="easting" type="number" step="any" placeholder="671000" />
-      <label>Northing</label>
-      <input id="northing" type="number" step="any" placeholder="2734000" />
-      <label>Zone</label>
-      <input id="zone" type="number" value="38" />
-      <button onclick="searchUTM()">بحث بالمتري</button>
-    </div>
-
-    <div class="result" id="result">
-      اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.
-    </div>
-
-    <div class="note">
-      في الجوال يفضل فتح الصفحة بمتصفح Chrome أو Safari محدث. ArcGIS Maps SDK يعتمد على WebGL2 ومتصفح مدعوم. :contentReference[oaicite:1]{index=1}
-    </div>
+  <div class="card">
+    <b>بحث عشري</b>
+    <input id="lat" placeholder="Latitude">
+    <input id="lon" placeholder="Longitude">
+    <button onclick="search()">بحث</button>
   </div>
 
-  <div id="viewDiv"></div>
+  <div id="result"></div>
 
-  <script>
-    let view, graphicsLayer, featureLayer;
+</div>
 
-    require([
-      "esri/Map",
-      "esri/views/MapView",
-      "esri/layers/FeatureLayer",
-      "esri/layers/GraphicsLayer",
-      "esri/Graphic",
-      "esri/geometry/Point",
-      "esri/geometry/SpatialReference",
-      "esri/geometry/projection"
-    ], function (
-      Map,
-      MapView,
-      FeatureLayer,
-      GraphicsLayer,
-      Graphic,
-      Point,
-      SpatialReference,
-      projection
-    ) {
+<div id="viewDiv"></div>
 
-      featureLayer = new FeatureLayer({
-        url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/ArcGIS/rest/services/Unblock18_4_2026/FeatureServer/0",
-        outFields: ["*"],
-        popupEnabled: false,
-        renderer: {
-          type: "simple",
-          symbol: {
-            type: "simple-line",
-            color: [255, 0, 0, 1],
-            width: 6
-          }
-        }
-      });
+<script>
 
-      graphicsLayer = new GraphicsLayer();
+require([
+  "esri/Map",
+  "esri/views/MapView",
+  "esri/layers/FeatureLayer",
+  "esri/Graphic"
+], function(Map, MapView, FeatureLayer, Graphic) {
 
-      const map = new Map({
-        basemap: "streets-navigation-vector",
-        layers: [featureLayer, graphicsLayer]
-      });
+  const layer = new FeatureLayer({
+    url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/Unblock18_4_2026/FeatureServer/0",
+    outFields: ["*"]
+  });
 
-      view = new MapView({
-        container: "viewDiv",
-        map: map,
-        popup: {
-          dockEnabled: true,
-          dockOptions: {
-            breakpoint: false,
-            position: "top-right"
-          }
-        }
-      });
+  const map = new Map({
+    basemap: "streets",
+    layers: [layer]
+  });
 
-      featureLayer.when(function () {
-        view.goTo(featureLayer.fullExtent).catch(function () {});
-      });
+  const view = new MapView({
+    container: "viewDiv",
+    map: map
+  });
 
-      view.when(function () {
-        view.on("click", function(event) {
-          view.hitTest(event).then(function(response) {
-            const results = response.results.filter(function(r) {
-              return r.graphic && r.graphic.layer === featureLayer;
-            });
+  view.on("click", function(event){
+    view.hitTest(event).then(function(response){
+      if(response.results.length > 0){
+        const g = response.results[0].graphic.attributes;
 
-            if (results.length > 0) {
-              const a = results[0].graphic.attributes || {};
-              const content =
-                "<b>رقم الطلب:</b> " + safeVal(a.RequestID) + "<br>" +
-                "<b>رقم الحظر:</b> " + safeVal(a.BlockingId) + "<br>" +
-                "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
-                "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
-                "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
-                "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType);
+        const info =
+          "رقم الطلب: " + g.RequestID + "<br>" +
+          "المقاول: " + g.ContractorName + "<br>" +
+          "الشارع: " + g.StreetName;
 
-              view.popup.open({
-                title: "طلب فك الحظر - " + safeVal(a.RequestID),
-                content: content,
-                location: event.mapPoint
-              });
-
-              document.getElementById("result").innerHTML = content;
-            }
-          });
-        });
-      });
-
-      window.searchDecimal = function () {
-        const lat = parseFloat(document.getElementById("latDecimal").value);
-        const lon = parseFloat(document.getElementById("lonDecimal").value);
-        if (isNaN(lat) || isNaN(lon)) {
-          alert("أدخل الإحداثيات العشرية بشكل صحيح");
-          return;
-        }
-        goToLatLon(lat, lon, "العشري");
-      };
-
-      window.searchDMS = function () {
-        const latText = document.getElementById("latDMS").value.trim();
-        const lonText = document.getElementById("lonDMS").value.trim();
-        const lat = dmsToDecimal(latText);
-        const lon = dmsToDecimal(lonText);
-
-        if (isNaN(lat) || isNaN(lon)) {
-          alert("صيغة الدرجات غير صحيحة");
-          return;
-        }
-
-        document.getElementById("latDecimal").value = lat.toFixed(6);
-        document.getElementById("lonDecimal").value = lon.toFixed(6);
-        goToLatLon(lat, lon, "الدرجات");
-      };
-
-      window.searchUTM = async function () {
-        const easting = parseFloat(document.getElementById("easting").value);
-        const northing = parseFloat(document.getElementById("northing").value);
-        const zone = parseInt(document.getElementById("zone").value);
-
-        if (isNaN(easting) || isNaN(northing) || isNaN(zone)) {
-          alert("أدخل الإحداثيات المترية بشكل صحيح");
-          return;
-        }
-
-        await projection.load();
-
-        const utmPoint = new Point({
-          x: easting,
-          y: northing,
-          spatialReference: new SpatialReference({ wkid: 32600 + zone })
-        });
-
-        const geoPoint = projection.project(
-          utmPoint,
-          new SpatialReference({ wkid: 4326 })
-        );
-
-        const lat = geoPoint.y;
-        const lon = geoPoint.x;
-
-        document.getElementById("latDecimal").value = lat.toFixed(6);
-        document.getElementById("lonDecimal").value = lon.toFixed(6);
-
-        goToLatLon(lat, lon, "المتري");
-      };
-
-      function goToLatLon(lat, lon, sourceName) {
-        const point = new Point({
-          longitude: lon,
-          latitude: lat,
-          spatialReference: { wkid: 4326 }
-        });
-
-        graphicsLayer.removeAll();
-
-        const pointGraphic = new Graphic({
-          geometry: point,
-          symbol: {
-            type: "simple-marker",
-            color: [220, 38, 38, 0.95],
-            size: 12,
-            outline: {
-              color: [255, 255, 255],
-              width: 2
-            }
-          }
-        });
-
-        graphicsLayer.add(pointGraphic);
-
-        view.goTo({
-          target: point,
-          zoom: 16
-        });
-
-        view.popup.open({
-          title: "الموقع المدخل",
-          content:
-            "<b>Latitude:</b> " + lat.toFixed(6) + "<br>" +
-            "<b>Longitude:</b> " + lon.toFixed(6),
-          location: point
-        });
-
-        document.getElementById("result").innerHTML =
-          "<b>تم البحث بواسطة:</b> " + sourceName + "<br>" +
-          "<b>Decimal:</b> " + lat.toFixed(6) + ", " + lon.toFixed(6);
-      }
-
-      window.clearInputs = function () {
-        document.getElementById("latDecimal").value = "";
-        document.getElementById("lonDecimal").value = "";
-        document.getElementById("latDMS").value = "";
-        document.getElementById("lonDMS").value = "";
-        document.getElementById("easting").value = "";
-        document.getElementById("northing").value = "";
-        document.getElementById("zone").value = "38";
-
-        graphicsLayer.removeAll();
-        view.popup.close();
-
-        document.getElementById("result").innerHTML =
-          "اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.";
-
-        featureLayer.when(function () {
-          view.goTo(featureLayer.fullExtent).catch(function () {});
-        });
-      };
-
-      function safeVal(v) {
-        return (v === null || v === undefined || v === "") ? "-" : v;
-      }
-
-      function dmsToDecimal(dms) {
-        const regex = /(\d+)[°\s]+(\d+)?['\s]*([\d.]+)?["\s]*([NSEW])/i;
-        const match = dms.match(regex);
-        if (!match) return NaN;
-
-        let deg = parseFloat(match[1]) || 0;
-        let min = parseFloat(match[2]) || 0;
-        let sec = parseFloat(match[3]) || 0;
-        let dir = match[4].toUpperCase();
-
-        let dec = deg + (min / 60) + (sec / 3600);
-        if (dir === "S" || dir === "W") dec *= -1;
-        return dec;
+        document.getElementById("result").innerHTML = info;
       }
     });
-  </script>
+  });
+
+  window.search = function(){
+    const lat = parseFloat(document.getElementById("lat").value);
+    const lon = parseFloat(document.getElementById("lon").value);
+
+    view.goTo({
+      center: [lon, lat],
+      zoom: 15
+    });
+  };
+
+});
+
+// 🔥 إضافة تاريخ اليوم
+(function () {
+  const today = new Date();
+  const d = String(today.getDate()).padStart(2, '0');
+  const m = String(today.getMonth()+1).padStart(2, '0');
+  const y = today.getFullYear();
+
+  document.getElementById("headerTitle").innerHTML =
+    "طلبات فك الحظر - " + d + "-" + m + "-" + y;
+})();
+
+</script>
+
 </body>
 </html>
