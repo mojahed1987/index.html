@@ -284,6 +284,34 @@
       });
     });
 
+    async function queryAllFeatures(whereClause, returnGeometry = true) {
+      let allFeatures = [];
+      let offset = 0;
+      const pageSize = 2000;
+
+      while (true) {
+        const query = featureLayer.createQuery();
+        query.where = whereClause || "1=1";
+        query.outFields = ["*"];
+        query.returnGeometry = returnGeometry;
+        query.start = offset;
+        query.num = pageSize;
+
+        const result = await featureLayer.queryFeatures(query);
+        const features = result.features || [];
+
+        allFeatures = allFeatures.concat(features);
+
+        if (features.length < pageSize) {
+          break;
+        }
+
+        offset += pageSize;
+      }
+
+      return allFeatures;
+    }
+
     window.searchByText = async function () {
       const keyword = document.getElementById("textSearch").value.trim();
 
@@ -294,16 +322,14 @@
 
       const safeKeyword = keyword.replace(/'/g, "''");
 
-      const query = featureLayer.createQuery();
-      query.where =
+      const whereClause =
         "UPPER(StreetName) LIKE UPPER('%" + safeKeyword + "%')" +
         " OR UPPER(ContractorName) LIKE UPPER('%" + safeKeyword + "%')";
-      query.outFields = ["*"];
-      query.returnGeometry = true;
 
       try {
-        const result = await featureLayer.queryFeatures(query);
-        lastSearchFeatures = result.features || [];
+        document.getElementById("result").innerHTML = "جاري البحث في كل البيانات...";
+
+        lastSearchFeatures = await queryAllFeatures(whereClause, true);
 
         if (lastSearchFeatures.length === 0) {
           document.getElementById("result").innerHTML = "لم يتم العثور على نتائج.";
@@ -351,52 +377,64 @@
     window.downloadExcel = async function () {
       let features = lastSearchFeatures;
 
-      if (!features || features.length === 0) {
-        const query = featureLayer.createQuery();
-        query.where = "1=1";
-        query.outFields = ["*"];
-        query.returnGeometry = false;
+      try {
+        if (!features || features.length === 0) {
+          document.getElementById("result").innerHTML = "جاري تحميل كل البيانات من الطبقة...";
 
-        const result = await featureLayer.queryFeatures(query);
-        features = result.features || [];
-      }
+          features = await queryAllFeatures("1=1", false);
+        }
 
-      if (features.length === 0) {
-        alert("لا توجد بيانات للتحميل");
-        return;
-      }
+        if (features.length === 0) {
+          alert("لا توجد بيانات للتحميل");
+          return;
+        }
 
-      const columns = [
-        "RequestID",
-        "BlockingId",
-        "ContractorName",
-        "StreetName",
-        "OwnerEntity",
-        "SubServiceType"
-      ];
+        const columns = [
+          "RequestID",
+          "BlockingId",
+          "ContractorName",
+          "StreetName",
+          "OwnerEntity",
+          "SubServiceType",
+          "PathLength",
+          "PathWidth",
+          "PathDepth",
+          "StreetWidth",
+          "الحي",
+          "SECTOR"
+        ];
 
-      let csv = "\uFEFF";
-      csv += columns.join(",") + "\n";
+        let csv = "\uFEFF";
+        csv += columns.join(",") + "\n";
 
-      features.forEach(function(feature) {
-        const a = feature.attributes || {};
-        const row = columns.map(function(col) {
-          return csvSafe(a[col]);
+        features.forEach(function(feature) {
+          const a = feature.attributes || {};
+          const row = columns.map(function(col) {
+            return csvSafe(a[col]);
+          });
+          csv += row.join(",") + "\n";
         });
-        csv += row.join(",") + "\n";
-      });
 
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "طلبات_فك_الحظر.csv";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "طلبات_فك_الحظر_كل_البيانات.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
-      URL.revokeObjectURL(url);
+        URL.revokeObjectURL(url);
+
+        document.getElementById("result").innerHTML =
+          "<b>تم تحميل الملف بنجاح.</b><br>" +
+          "<b>عدد السجلات:</b> " + features.length;
+
+      } catch (error) {
+        console.error(error);
+        alert("حدث خطأ أثناء تحميل البيانات.");
+      }
     };
 
     window.locateUser = function () {
@@ -559,7 +597,9 @@
         "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
         "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
         "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
-        "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType);
+        "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType) + "<br>" +
+        "<b>الحي:</b> " + safeVal(a["الحي"]) + "<br>" +
+        "<b>القطاع:</b> " + safeVal(a.SECTOR);
 
       view.popup.open({
         title: "طلب فك الحظر - " + safeVal(a.RequestID),
@@ -597,7 +637,6 @@
 
   });
 
-  // إضافة تاريخ اليوم للعنوان
   (function () {
     const today = new Date();
     const d = String(today.getDate()).padStart(2, "0");
