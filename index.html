@@ -87,17 +87,9 @@
       margin-top: 8px;
     }
 
-    .secondary {
-      background: #64748b;
-    }
-
-    .green {
-      background: #15803d;
-    }
-
-    .orange {
-      background: #c2410c;
-    }
+    .secondary { background: #64748b; }
+    .green { background: #15803d; }
+    .orange { background: #c2410c; }
 
     .result {
       background: #eef6ff;
@@ -202,7 +194,7 @@
     </div>
 
     <div class="note">
-      ملاحظة: زر موقعي يحتاج تشغيل GPS والسماح للمتصفح بالوصول للموقع.
+      ملاحظة: زر المسطرة يظهر أعلى الخريطة. اضغط عليه ثم ارسم خط القياس.
     </div>
 
   </div>
@@ -221,7 +213,9 @@
     "esri/Graphic",
     "esri/geometry/Point",
     "esri/geometry/SpatialReference",
-    "esri/geometry/projection"
+    "esri/geometry/projection",
+    "esri/widgets/DistanceMeasurement2D",
+    "esri/widgets/Expand"
   ], function (
     Map,
     MapView,
@@ -230,11 +224,13 @@
     Graphic,
     Point,
     SpatialReference,
-    projection
+    projection,
+    DistanceMeasurement2D,
+    Expand
   ) {
 
     featureLayer = new FeatureLayer({
-      url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/%D8%B7%D8%A8%D9%82%D8%A9_%D9%81%D9%83_%D8%A7%D9%84%D8%AD%D8%B8%D8%B1_10_5_2026/FeatureServer",
+      url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/%D8%B7%D8%A8%D9%82%D8%A9_%D9%81%D9%83_%D8%A7%D9%84%D8%AD%D8%B8%D8%B1_10_5_2026/FeatureServer/0",
       outFields: ["*"],
       popupEnabled: false,
       renderer: {
@@ -266,8 +262,25 @@
       }
     });
 
+    const distanceWidget = new DistanceMeasurement2D({
+      view: view,
+      unit: "meters"
+    });
+
+    const distanceExpand = new Expand({
+      view: view,
+      content: distanceWidget,
+      expanded: false
+    });
+
+    view.ui.add(distanceExpand, "top-right");
+
     featureLayer.when(function () {
       view.goTo(featureLayer.fullExtent).catch(function () {});
+    }).catch(function(error) {
+      console.error("Layer failed:", error);
+      document.getElementById("result").innerHTML =
+        "تعذر تحميل الطبقة. تأكد أن رابط FeatureServer/0 صحيح وأن الطبقة عامة.";
     });
 
     view.when(function () {
@@ -302,9 +315,7 @@
 
         allFeatures = allFeatures.concat(features);
 
-        if (features.length < pageSize) {
-          break;
-        }
+        if (features.length < pageSize) break;
 
         offset += pageSize;
       }
@@ -380,7 +391,6 @@
       try {
         if (!features || features.length === 0) {
           document.getElementById("result").innerHTML = "جاري تحميل كل البيانات من الطبقة...";
-
           features = await queryAllFeatures("1=1", false);
         }
 
@@ -541,6 +551,7 @@
       lastSearchFeatures = [];
       graphicsLayer.removeAll();
       view.popup.close();
+      distanceWidget.viewModel.clear();
 
       document.getElementById("result").innerHTML =
         "اضغط على أي خط داخل الخريطة أو أدخل إحداثيات للبحث.";
