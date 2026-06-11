@@ -58,7 +58,7 @@
       font-weight: bold;
     }
 
-    input {
+    input, textarea {
       width: 100%;
       box-sizing: border-box;
       padding: 10px;
@@ -66,6 +66,14 @@
       border-radius: 8px;
       font-size: 14px;
       background: white;
+      font-family: Tahoma, Arial, sans-serif;
+    }
+
+    textarea {
+      min-height: 95px;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
     }
 
     .btn-row {
@@ -158,6 +166,18 @@
     </div>
 
     <div class="card">
+      <h3>البحث بأرقام الطلبات</h3>
+      <label>RequestID</label>
+      <textarea id="requestIds" placeholder="مثال:
+87021
+87755
+88147
+أو: 87021, 87755, 88147"></textarea>
+      <button onclick="searchByRequestIDs()">بحث بالأرقام</button>
+      <div class="note">يمكن لصق الأرقام كل رقم في سطر أو مفصولة بفواصل.</div>
+    </div>
+
+    <div class="card">
       <h3>البحث العشري</h3>
       <label>Latitude</label>
       <input id="latDecimal" type="number" step="any" placeholder="24.7136" />
@@ -205,6 +225,11 @@
   let view, graphicsLayer, featureLayer;
   let lastSearchFeatures = [];
 
+  // رابط خدمة ArcGIS المحدثة
+  const FEATURE_SERVICE_URL = "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/%D8%B7%D8%A8%D9%82%D8%A9_%D9%81%D9%83_%D8%A7%D9%84%D8%AD%D8%B8%D8%B1_10_5_2026/FeatureServer";
+  const LAYER_ID = 0;
+  const LAYER_URL = FEATURE_SERVICE_URL + "/" + LAYER_ID;
+
   require([
     "esri/Map",
     "esri/views/MapView",
@@ -230,7 +255,7 @@
   ) {
 
     featureLayer = new FeatureLayer({
-      url: "https://services3.arcgis.com/MyuSGyE93HNIoCWs/arcgis/rest/services/%D8%B7%D8%A8%D9%82%D8%A9_%D9%81%D9%83_%D8%A7%D9%84%D8%AD%D8%B8%D8%B1_10_5_2026/FeatureServer/0",
+      url: LAYER_URL,
       outFields: ["*"],
       popupEnabled: false,
       renderer: {
@@ -277,6 +302,11 @@
 
     featureLayer.when(function () {
       view.goTo(featureLayer.fullExtent).catch(function () {});
+      document.getElementById("result").innerHTML =
+        "تم تحميل الطبقة بنجاح.<br>" +
+        "<b>اسم الطبقة:</b> " + safeVal(featureLayer.title) + "<br>" +
+        "<b>Layer:</b> " + LAYER_ID + "<br>" +
+        "<b>استخدم البحث أو اضغط على أي خط داخل الخريطة.</b>";
     }).catch(function(error) {
       console.error("Layer failed:", error);
       document.getElementById("result").innerHTML =
@@ -385,6 +415,85 @@
       }
     };
 
+    window.searchByRequestIDs = async function () {
+      const raw = document.getElementById("requestIds").value.trim();
+
+      if (!raw) {
+        alert("أدخل أرقام الطلبات");
+        return;
+      }
+
+      const ids = raw
+        .split(/[^0-9]+/)
+        .map(v => v.trim())
+        .filter(v => v !== "");
+
+      const uniqueIds = [...new Set(ids)];
+
+      if (uniqueIds.length === 0) {
+        alert("لم يتم العثور على أرقام صحيحة");
+        return;
+      }
+
+      // تقسيم القائمة حتى لا يكون الاستعلام طويلاً جداً
+      const chunks = [];
+      for (let i = 0; i < uniqueIds.length; i += 900) {
+        chunks.push(uniqueIds.slice(i, i + 900));
+      }
+
+      try {
+        document.getElementById("result").innerHTML = "جاري البحث بأرقام الطلبات...";
+        graphicsLayer.removeAll();
+        lastSearchFeatures = [];
+
+        for (const chunk of chunks) {
+          const whereClause = "RequestID IN (" + chunk.join(",") + ")";
+          const found = await queryAllFeatures(whereClause, true);
+          lastSearchFeatures = lastSearchFeatures.concat(found);
+        }
+
+        if (lastSearchFeatures.length === 0) {
+          document.getElementById("result").innerHTML = "لم يتم العثور على نتائج لهذه الأرقام.";
+          return;
+        }
+
+        lastSearchFeatures.forEach(function(feature) {
+          const highlightGraphic = feature.clone();
+          highlightGraphic.symbol = {
+            type: "simple-line",
+            color: [0, 102, 255, 1],
+            width: 7
+          };
+          graphicsLayer.add(highlightGraphic);
+        });
+
+        view.goTo(lastSearchFeatures.map(f => f.geometry)).catch(function () {});
+
+        let html = "<b>عدد الأرقام المدخلة:</b> " + uniqueIds.length + "<br>";
+        html += "<b>عدد المسارات المطابقة:</b> " + lastSearchFeatures.length + "<br><hr>";
+
+        lastSearchFeatures.slice(0, 30).forEach(function(feature, index) {
+          const a = feature.attributes || {};
+          html +=
+            "<b>" + (index + 1) + ".</b> " +
+            "طلب: " + safeVal(a.RequestID) +
+            " | المقاول: " + safeVal(a.ContractorName) +
+            " | الشارع: " + safeVal(a.StreetName) +
+            "<br>";
+        });
+
+        if (lastSearchFeatures.length > 30) {
+          html += "<br>تم عرض أول 30 نتيجة فقط في القائمة، ويمكن تحميل الكل من زر Excel.";
+        }
+
+        document.getElementById("result").innerHTML = html;
+
+      } catch (error) {
+        console.error(error);
+        alert("حدث خطأ أثناء البحث بأرقام الطلبات. تأكد أن حقل RequestID موجود ورقمي.");
+      }
+    };
+
     window.downloadExcel = async function () {
       let features = lastSearchFeatures;
 
@@ -401,7 +510,10 @@
 
         const columns = [
           "RequestID",
+          "تاريخ_ارسال_الطلبات",
           "BlockingId",
+          "PermitRequestDate",
+          "PermitReqNum",
           "ContractorName",
           "StreetName",
           "OwnerEntity",
@@ -411,7 +523,9 @@
           "PathDepth",
           "StreetWidth",
           "الحي",
-          "SECTOR"
+          "SECTOR",
+          "Shape__Length_1",
+          "Shape__Length"
         ];
 
         let csv = "\uFEFF";
@@ -605,10 +719,12 @@
       const content =
         "<b>رقم الطلب:</b> " + safeVal(a.RequestID) + "<br>" +
         "<b>رقم الحظر:</b> " + safeVal(a.BlockingId) + "<br>" +
+        "<b>رقم طلب الرخصة:</b> " + safeVal(a.PermitReqNum) + "<br>" +
         "<b>المقاول:</b> " + safeVal(a.ContractorName) + "<br>" +
         "<b>اسم الشارع:</b> " + safeVal(a.StreetName) + "<br>" +
         "<b>الجهة المالكة:</b> " + safeVal(a.OwnerEntity) + "<br>" +
         "<b>نوع الخدمة:</b> " + safeVal(a.SubServiceType) + "<br>" +
+        "<b>طول المسار:</b> " + safeVal(a.PathLength) + "<br>" +
         "<b>الحي:</b> " + safeVal(a["الحي"]) + "<br>" +
         "<b>القطاع:</b> " + safeVal(a.SECTOR);
 
