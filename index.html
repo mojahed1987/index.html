@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>طلبات فك الحظر</title>
 
+  <!-- Google Analytics 4: page views -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XF7KB3RJVW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-XF7KB3RJVW');
+
+    // Track anonymous interactions only; never send search text or coordinates.
+    function trackEvent(name, details) {
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', name, details || {});
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
   <script src="https://js.arcgis.com/4.30/"></script>
 
@@ -292,6 +308,7 @@
 
           if (results.length > 0) {
             showFeatureInfo(results[0].graphic, event.mapPoint);
+            trackEvent('unblocking_feature_view', { source: 'map_click' });
           }
         });
       });
@@ -341,6 +358,10 @@
         document.getElementById("result").innerHTML = "جاري البحث في كل البيانات...";
 
         lastSearchFeatures = await queryAllFeatures(whereClause, true);
+        trackEvent('unblocking_search', {
+          search_method: 'text',
+          results_count: lastSearchFeatures.length
+        });
 
         if (lastSearchFeatures.length === 0) {
           document.getElementById("result").innerHTML = "لم يتم العثور على نتائج.";
@@ -433,6 +454,11 @@
         a.download = "طلبات_فك_الحظر_كل_البيانات.csv";
         document.body.appendChild(a);
         a.click();
+        trackEvent('unblocking_download', {
+          file_type: 'csv',
+          records_count: features.length,
+          download_scope: lastSearchFeatures.length > 0 ? 'search_results' : 'all_records'
+        });
         document.body.removeChild(a);
 
         URL.revokeObjectURL(url);
@@ -459,6 +485,7 @@
           const lon = position.coords.longitude;
 
           goToLatLon(lat, lon, "موقع المستخدم الحالي");
+          trackEvent('unblocking_locate_success', { method: 'browser_geolocation' });
 
           document.getElementById("result").innerHTML =
             "<b>موقعك الحالي:</b><br>" +
@@ -486,6 +513,7 @@
       }
 
       goToLatLon(lat, lon, "العشري");
+      trackEvent('unblocking_coordinate_search', { search_method: 'decimal' });
     };
 
     window.searchDMS = function () {
@@ -504,6 +532,7 @@
       document.getElementById("lonDecimal").value = lon.toFixed(6);
 
       goToLatLon(lat, lon, "الدرجات");
+      trackEvent('unblocking_coordinate_search', { search_method: 'dms' });
     };
 
     window.searchUTM = async function () {
@@ -536,6 +565,7 @@
       document.getElementById("lonDecimal").value = lon.toFixed(6);
 
       goToLatLon(lat, lon, "المتري");
+      trackEvent('unblocking_coordinate_search', { search_method: 'utm' });
     };
 
     window.clearInputs = function () {
